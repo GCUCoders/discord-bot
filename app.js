@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
+import { bible } from './commands/bible.js';
 dotenv.config();
 
 const client = new Client({
@@ -12,6 +13,10 @@ client.on('messageCreate', (message) => {
 
 	console.log(message.content);
 	if (message.content === '!ping') return message.reply('Pong!'); //respond to !ping
+
+	const args = message.content.split(' ').slice(1); //split message into array of args
+
+	if (message.content.startsWith('!bible')) return bible(message, args);
 
 	message.reply('@everyone');
 });
