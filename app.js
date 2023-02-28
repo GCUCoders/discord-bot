@@ -1,18 +1,36 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import dotenv from 'dotenv';
+import klaw from 'klaw';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { EmbedBase } from './classes/EmbedBase.js';
-import { bible } from './commands/bible.js';
 dotenv.config();
 
 const client = new Client({
 	allowedMentions: { parse: ['everyone'] },
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
 });
+client.commands = new Collection();
 
 await mkdir('cache', { recursive: true });
 const levels = JSON.parse(await readFile('cache/levels.json', 'utf-8').catch(() => '{}'));
 console.log(levels);
+
+// Import commands
+for await (const item of klaw('./commands')) {
+	const cmdFile = path.parse(item.path);
+	if (!cmdFile.ext || cmdFile.ext !== '.js') continue;
+	const cmdName = cmdFile.name.split('.')[0];
+	try {
+		const cmd = new (
+			await import('./' + path.relative(process.cwd(), `${cmdFile.dir}${path.sep}${cmdFile.name}${cmdFile.ext}`))
+		).default();
+		client.commands.set(cmdName, cmd);
+	} catch (error) {
+		console.error(error);
+	}
+}
+console.log(`Loaded ${client.commands.size} commands`);
 
 client.on('messageCreate', (message) => {
 	if (message.author.id === client.user.id) return; //dont respond to myself
@@ -50,8 +68,28 @@ client.on('messageCreate', async (message) => {
 	await writeFile('cache/levels.json', JSON.stringify(levels), 'utf-8');
 });
 
-client.on('ready', () => {
+// Slash commands
+client.on('interactionCreate', async (intr) => {
+	if (!intr.isCommand()) return;
+	// Ignore commands sent by other bots
+	if (intr.user.bot) return;
+
+	const command = client.commands.get(intr.commandName);
+
+	await command.run({ intr, opts: intr.options });
+});
+
+client.on('ready', async () => {
+	await postInit();
 	console.log(`Logged in as ${client.user.tag}!`);
 });
+
+async function postInit() {
+	try {
+		await client.application.commands.set(client.commands);
+	} catch (err) {
+		console.error('postInit error', err);
+	}
+}
 
 client.login(process.env.BOT_TOKEN);
