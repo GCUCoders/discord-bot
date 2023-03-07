@@ -86,7 +86,8 @@ client.on('ready', async () => {
 
 async function postInit() {
 	try {
-		await client.application.commands.set(client.commands);
+		await client.guilds.resolve('284847469492437002').commands.set(client.commands);
+		// await client.application.commands.set([]);
 	} catch (err) {
 		console.error('postInit error', err);
 	}
